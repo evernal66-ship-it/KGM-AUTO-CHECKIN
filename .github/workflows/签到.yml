@@ -37,32 +37,7 @@ jobs:
         run: npm run install
         if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
 
-      # 预检要读凭据文件：把 Secret 里的 USERINFO 落成 data/userinfo.json。
-      # 用 printf 而不是 echo，避免凭据被回显进日志。
-      - name: 准备凭据文件
-        run: |
-          mkdir -p data
-          printf '%s' "$USERINFO" > data/userinfo.json
-          echo "凭据文件已写入 $(wc -c < data/userinfo.json) 字节"
-        env:
-          USERINFO: ${{ secrets.USERINFO }}
-
-      # 只读预检：概念版 SVIP 若已覆盖到明天，说明今日 8 次额度已经领满，
-      # 直接跳过真实请求。这样当天被重复触发时日志不会再出现「次数已用光」的假失败。
-      # 退出码：0 = 已覆盖应跳过；1/2 = 需要签到。
-      - name: VIP 覆盖预检
-        id: precheck
-        continue-on-error: true
-        run: node vip-covered.mjs
-
-      - name: 预检结论
-        if: ${{ steps.precheck.outcome == 'success' }}
-        run: |
-          echo "SVIP 已覆盖到明天，今日额度已领满，跳过真实请求（这不是失败）。"
-          echo "如需强制重新领取，手动把 data/checkin_state.json 删掉后重跑。"
-
       - name: 执行签到
-        if: ${{ steps.precheck.outcome != 'success' }}
         run: npm run main
         env:
           USERINFO: ${{ secrets.USERINFO }}
